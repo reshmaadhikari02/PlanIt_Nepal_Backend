@@ -4,62 +4,27 @@ const { deleteFromCloudinary, uploadToCloudinary } = require('../config/cloudina
 exports.uploadDish = async (req, res) => {
   const { name, price, description } = req.body;
   let category = req.params.category;
-  
   try {
-    console.log('Request body:', req.body);
-    console.log('Request file:', req.file);
-    console.log('Category:', category);
-
-    // Validation
-    if (!category || !name || !price || !description) {
+    if (!category || !name || !price || !description || !req.file) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide category, dish name, price, and description'
+        message: 'Please provide category, dish name, and image'
       });
     }
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide an image file'
-      });
-    }
-
-    // Validate price is a number
-    const parsedPrice = parseFloat(price);
-    if (isNaN(parsedPrice) || parsedPrice <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Price must be a valid positive number'
-      });
-    }
-
     category = category.toLowerCase();
-    
-    console.log('Uploading to Cloudinary...');
     const result = await uploadToCloudinary(req.file.buffer);
-    console.log('Cloudinary result:', result);
-
     const newDish = {
-      name: name.trim(),
-      price: parsedPrice,
-      description: description.trim(),
+      name,
+      price,
+      description,
       image: result.secure_url,
-      imageId: result.public_id,
-      rating: 0,
-      totalRatings: 0,
-      ratings: []
+      imageId: result.public_id
     };
-
-    console.log('Updating database...');
     const updatedCategory = await Cuisine.findOneAndUpdate(
       { category },
       { $push: { dishes: newDish } },
       { new: true, upsert: true }
     );
-    
-    console.log('Database updated successfully');
-
     return res.status(201).json({
       success: true,
       message: 'Dish added successfully',
@@ -69,27 +34,9 @@ exports.uploadDish = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in uploadDish:', error);
-    console.error('Error stack:', error.stack);
-    
-    // Handle specific errors
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error: ' + error.message
-      });
-    }
-    
-    if (error.message && error.message.includes('Cloudinary')) {
-      return res.status(500).json({
-        success: false,
-        message: 'Image upload failed'
-      });
-    }
-
     res.status(500).json({
       success: false,
-      message: 'Internal server error: ' + error.message
+      message: 'Internal server error'
     });
   }
 };
