@@ -56,7 +56,7 @@ const forgotPasswordLimiter = rateLimit({
 // General API limiter - Balanced for normal usage
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 500,
+    max: 5000,
     message: {
         success: false,
         message: 'Too many requests from this IP, please try again after 15 minutes.'
