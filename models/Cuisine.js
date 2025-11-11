@@ -54,7 +54,6 @@ const dishSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
-dishRatingSchema.index({ userId: 1 }, { unique: true });
 
 const cuisineSchema = new mongoose.Schema({
     category: {
