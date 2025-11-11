@@ -85,7 +85,7 @@ exports.startPayment = async (req, res) => {
       }],
       mode: 'payment',
       success_url: `${process.env.FRONTEND_URL}/order-success`,
-      cancel_url: `${process.env.FRONTEND_URL}/payment-cancel`,
+      cancel_url: `${process.env.FRONTEND_URL}/`,
       metadata: {
         orderId: order._id.toString(),
         userId: userId,
