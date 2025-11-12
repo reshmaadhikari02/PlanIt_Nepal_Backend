@@ -20,31 +20,99 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
     const { name, email, number } = req.body;
     const userId = req.user.id;
+    
     try {
+        // Enhanced logging
+        console.log('Full request body:', JSON.stringify(req.body, null, 2));
+        console.log('Email type:', typeof email);
+        console.log('Email length:', email?.length);
+        console.log('Email raw:', email);
+        console.log('Email with quotes:', `"${email}"`);
+        
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
-        if (email && email !== user.email) {
-            const emailExists = await User.findOne({ email, _id: { $ne: userId } });
+
+        console.log('Current user email:', user.email);
+        console.log('Current email type:', typeof user.email);
+        console.log('Are emails equal?', email === user.email);
+        console.log('Email comparison (strict):', JSON.stringify(email) === JSON.stringify(user.email));
+
+        // Trim and normalize email
+        const normalizedEmail = email?.trim().toLowerCase();
+        const currentEmail = user.email?.trim().toLowerCase();
+        
+        console.log('Normalized new email:', normalizedEmail);
+        console.log('Normalized current email:', currentEmail);
+        console.log('Normalized emails equal?', normalizedEmail === currentEmail);
+
+        if (email && normalizedEmail !== currentEmail) {
+            console.log('Email is different, checking for duplicates...');
+            
+            const emailExists = await User.findOne({ 
+                email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') }, 
+                _id: { $ne: userId } 
+            });
+            
             if (emailExists) {
+                console.log('Email already exists:', emailExists.email);
                 return res.status(400).json({ success: false, message: 'Email already in use by another account' });
             }
-            user.email = email;
+            
+            console.log('Email is unique, updating...');
+            user.email = normalizedEmail;
+        } else {
+            console.log('Email unchanged or not provided');
         }
+
         if (number && number !== user.number) {
+            console.log('Number is different, checking for duplicates...');
+            
             const numberExists = await User.findOne({ number, _id: { $ne: userId } });
             if (numberExists) {
+                console.log('Number already exists:', numberExists.number);
                 return res.status(400).json({ success: false, message: 'Number already in use by another account' });
             }
+            
+            console.log('Number is unique, updating...');
             user.number = number;
         }
-        if (name) user.name = name;
-        await user.save();
-        const { password, refreshToken, resetPasswordToken, resetPasswordExpire, ...safeUser } = user.toObject();
-        res.status(200).json({ success: true, message: 'Profile updated successfully', user: safeUser });
-    } catch {
-        res.status(500).json({ success: false, message: 'Internal Server Error' });
+
+        if (name && name.trim() !== user.name) {
+            console.log('Updating name from', user.name, 'to', name.trim());
+            user.name = name.trim();
+        }
+
+        console.log('Final user object before save:', {
+            name: user.name,
+            email: user.email,
+            number: user.number
+        });
+
+        console.log('Saving user...');
+        const savedUser = await user.save();
+        console.log('User saved successfully. New email:', savedUser.email);
+
+        const { password, refreshToken, resetPasswordToken, resetPasswordExpire, ...safeUser } = savedUser.toObject();
+        
+        res.status(200).json({ 
+            success: true, 
+            message: 'Profile updated successfully', 
+            user: safeUser 
+        });
+        
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        if (error.code === 11000) {
+            console.error('Duplicate key error:', error.keyPattern);
+        }
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal Server Error: ' + error.message 
+        });
     }
 };
 

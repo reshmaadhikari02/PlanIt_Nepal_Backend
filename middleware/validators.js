@@ -58,8 +58,7 @@ const profileUpdateValidation = [
     .isLength({ min: 2 }).withMessage('Name must be at least 2 characters long'),
   body('email')
     .optional()
-    .isEmail().withMessage('Valid email is required')
-    .normalizeEmail(),
+    .isEmail().withMessage('Valid email is required'),
   body('number')
     .optional()
     .isMobilePhone().withMessage('Valid phone number is required'),
