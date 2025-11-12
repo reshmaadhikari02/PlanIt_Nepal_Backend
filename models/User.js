@@ -1,4 +1,3 @@
-
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -14,6 +13,8 @@ const userSchema = new mongoose.Schema({
     number: {
         type: Number,
         unique: true,
+        sparse: true, // This allows multiple null values
+        default: undefined // Use undefined instead of null
     },
     password: {
         type: String,
