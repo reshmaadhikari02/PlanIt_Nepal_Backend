@@ -5,6 +5,7 @@ const { sendOrderConfirmationEmail } = require('../utils/emailHelper');
 exports.startPayment = async (req, res) => {
   const { orderId, paymentAmount } = req.body;
   const userId = req.user.id;
+  
   try {
     const order = await Order.findById(orderId).populate('userId');
     if (!order) {
@@ -13,26 +14,36 @@ exports.startPayment = async (req, res) => {
         message: "Order not found"
       });
     }
+
     if (order.userId._id.toString() !== userId) {
       return res.status(403).json({
         success: false,
         message: "You can only make payments for your own orders"
       });
     }
+
+    // Handle cash payment case
     if (!paymentAmount) {
-      order.paymentType = 'cash_after_service';
-      order.status = 'confirmed';
-      order.paymentStatus = 'pending';
+      // Update order immediately
+      const updateData = {
+        paymentType: 'cash_after_service',
+        status: 'confirmed',
+        paymentStatus: 'pending'
+      };
+
+      // Update booking status for venues/studios
       order.items.forEach(item => {
         if (item.itemType === 'venue' || item.itemType === 'studio') {
           item.bookingStatus = 'confirmed';
         }
       });
+
+      // Save order first
+      Object.assign(order, updateData);
       await order.save();
-      try {
-        await sendOrderConfirmationEmail({ order, user: order.userId }, 'cash_payment');
-      } catch (emailError) {}
-      return res.status(200).json({
+
+      // Send response immediately
+      const response = {
         success: true,
         message: "Order confirmed for cash payment after service",
         sessionUrl: null,
@@ -45,10 +56,25 @@ exports.startPayment = async (req, res) => {
           paymentStatus: order.paymentStatus,
           items: order.items
         }
+      };
+
+      // Send email asynchronously (don't wait for it)
+      setImmediate(async () => {
+        try {
+          await sendOrderConfirmationEmail({ order, user: order.userId }, 'cash_payment');
+          console.log('✅ Order confirmation email sent successfully');
+        } catch (emailError) {
+          console.error('❌ Error sending order confirmation email:', emailError);
+        }
       });
+
+      return res.status(200).json(response);
     }
+
+    // Handle advance payment case (rest of your code remains the same)
     order.paymentType = 'advance_payment';
     await order.save();
+
     let amount;
     let paymentAmountType;
     if (paymentAmount === '25_percent') {
@@ -63,12 +89,14 @@ exports.startPayment = async (req, res) => {
         message: "Invalid paymentAmount. Use '25_percent' or 'full_payment'"
       });
     }
+
     if (amount < 50) {
       return res.status(400).json({
         success: false,
         message: "Payment amount must be at least $0.50"
       });
     }
+
     const session = await stripeClient.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: order.userId.email,
@@ -92,13 +120,16 @@ exports.startPayment = async (req, res) => {
         paymentAmountType: paymentAmountType
       }
     });
+
     return res.status(200).json({
       success: true,
       sessionUrl: session.url,
       sessionId: session.id,
       message: "Payment session created successfully"
     });
+
   } catch (error) {
+    console.error('Error in startPayment:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
